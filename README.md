@@ -4,6 +4,18 @@ A shell function to easily manipulate your `$PATH`.
 
 ## Installation
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew install boochtek/tap/path
+```
+
+Then add to your `~/.bashrc` or `~/.zshrc`:
+
+```bash
+source "$(brew --prefix)/opt/path/path.sh"
+```
+
 ### Manual
 
 Clone the repository:
@@ -83,7 +95,7 @@ fi
 
 ## Features
 
-- **Idempotent**: `add` silently succeeds if path already exists; `remove` silently succeeds if path doesn't exist
+- **Idempotent**: `add` silently succeeds if path exists; `remove` silently succeeds if path doesn't exist
 - **Duplicate detection**: Warns when operating on paths that appear multiple times
 - **Path normalization**: Expands `~` and removes trailing slashes (preserves `$VARIABLES`)
 - **Validation**: `check` shows which paths don't exist on the filesystem
@@ -96,7 +108,7 @@ fi
 
 ## Why a shell function?
 
-A standalone script cannot modify the parent shell's environment.
+A standalone script cannot modify the parent shell's environment variables (like `$PATH`).
 The `path` command **MUST** be a shell function that gets sourced into your shell session.
 
 ## License

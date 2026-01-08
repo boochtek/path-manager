@@ -1,4 +1,4 @@
-# path - Manipulate $PATH easily
+# path - Easily manipulate $PATH
 # Source this file in your .bashrc or .zshrc
 # Compatible with Bash 3.2+ and Zsh
 #
@@ -43,7 +43,7 @@ _path_normalize() {
 _path_to_array() {
     local IFS=':'
     if [[ -n "$ZSH_VERSION" ]]; then
-        echo "${(ps.:.)PATH}"
+        printf '%s\n' "${(@s.:.)PATH}"
     else
         local -a arr=($PATH)
         printf '%s\n' "${arr[@]}"
@@ -86,11 +86,7 @@ _path_warn_if_dup() {
 # --- Commands ---
 
 _path_list() {
-    local i=1
-    while IFS= read -r p; do
-        printf '%3d  %s\n' "$i" "$p"
-        ((i++))
-    done < <(_path_to_array)
+    _path_to_array | nl
 }
 
 _path_add() {
@@ -134,10 +130,10 @@ _path_add() {
 
             _path_warn_if_dup "$relative_to"
 
-            local -a parts=() new_parts=() inserted=0
+            local inserted=0 entry
+            local -a parts=() new_parts=()
             while IFS= read -r p; do parts+=("$p"); done < <(_path_to_array)
 
-            local entry
             for entry in "${parts[@]}"; do
                 if [[ "$entry" == "$relative_to" && $inserted -eq 0 ]]; then
                     [[ "$position" == "before" ]] && new_parts+=("$new_path")
@@ -156,22 +152,37 @@ _path_add() {
 }
 
 _path_remove() {
-    local target
-    target="$(_path_normalize "$1")"
-    [[ -z "$target" ]] && { _path_error "Usage: path remove <path>"; return 1; }
+    [[ $# -eq 0 ]] && { _path_error "Usage: path remove <path> [<path> ...]"; return 1; }
 
-    _path_contains "$target" || return 0
+    local target entry to_remove
+    local -a targets=() parts=() new_parts=()
 
-    local -a parts=() new_parts=()
+    # Normalize all targets
+    for target in "$@"; do
+        targets+=("$(_path_normalize "$target")")
+    done
+
+    # Get current PATH entries
     while IFS= read -r p; do parts+=("$p"); done < <(_path_to_array)
 
-    local entry
+    # Filter out all targets
     for entry in "${parts[@]}"; do
-        [[ "$entry" != "$target" ]] && new_parts+=("$entry")
+        local should_remove=0
+        for to_remove in "${targets[@]}"; do
+            if [[ "$entry" == "$to_remove" ]]; then
+                should_remove=1
+                break
+            fi
+        done
+        [[ $should_remove -eq 0 ]] && new_parts+=("$entry")
     done
+
     export PATH="$(_path_from_array "${new_parts[@]}")"
 
-    _path_info "Removed: $target"
+    # Report what was removed
+    for to_remove in "${targets[@]}"; do
+        _path_info "Removed: $to_remove"
+    done
 }
 
 _path_move() {
@@ -218,16 +229,16 @@ _path_move() {
     _path_warn_if_dup "$target"
 
     # Remove target from current position (all occurrences)
+    local entry inserted=0
     local -a parts=() without_target=()
     while IFS= read -r p; do parts+=("$p"); done < <(_path_to_array)
 
-    local entry
     for entry in "${parts[@]}"; do
         [[ "$entry" != "$target" ]] && without_target+=("$entry")
     done
 
     # Insert at new position
-    local -a new_parts=() inserted=0
+    local -a new_parts=()
     case "$position" in
         beginning)
             new_parts=("$target" "${without_target[@]}")
@@ -254,14 +265,14 @@ _path_move() {
 }
 
 _path_check() {
-    local missing=0 dup_count=0
+    local missing=0 dup_count=0 is_dup i
     local -a seen=()
 
     while IFS= read -r p; do
         # Check for duplicates
-        local is_dup=0 s
-        for s in "${seen[@]}"; do
-            if [[ "$s" == "$p" ]]; then
+        is_dup=0
+        for ((i=0; i<${#seen[@]}; i++)); do
+            if [[ "${seen[i]}" == "$p" ]]; then
                 is_dup=1
                 break
             fi
@@ -296,11 +307,12 @@ _path_check() {
 }
 
 _path_dedup() {
+    local is_dup i
     local -a seen=() new_parts=()
     while IFS= read -r p; do
-        local is_dup=0 s
-        for s in "${seen[@]}"; do
-            [[ "$s" == "$p" ]] && { is_dup=1; break; }
+        is_dup=0
+        for ((i=0; i<${#seen[@]}; i++)); do
+            [[ "${seen[i]}" == "$p" ]] && { is_dup=1; break; }
         done
         if [[ $is_dup -eq 0 ]]; then
             seen+=("$p")
@@ -313,12 +325,13 @@ _path_dedup() {
 }
 
 _path_clean() {
+    local is_dup i
     local -a seen=() new_parts=()
     while IFS= read -r p; do
         # Skip duplicates
-        local is_dup=0 s
-        for s in "${seen[@]}"; do
-            [[ "$s" == "$p" ]] && { is_dup=1; break; }
+        is_dup=0
+        for ((i=0; i<${#seen[@]}; i++)); do
+            [[ "${seen[i]}" == "$p" ]] && { is_dup=1; break; }
         done
 
         if [[ $is_dup -eq 1 ]]; then
@@ -350,7 +363,7 @@ Commands:
     --end, -e                     Add to end (default)
     --before <other>              Add before <other>
     --after <other>               Add after <other>
-  remove, rm, del <path>        Remove path from PATH
+  remove, rm, del <path>...     Remove one or more paths from PATH
   move, mv <path>               Move existing path to new position
     --beginning, -b               Move to beginning
     --end, -e                     Move to end
@@ -368,6 +381,7 @@ Examples:
   path add ~/bin -b             Add ~/bin to beginning of PATH
   path add ~/bin --before /usr/bin
   path remove ~/bin             Remove ~/bin from PATH
+  path remove ~/bin /usr/sbin   Remove multiple paths
   path move /usr/local/bin -b   Move /usr/local/bin to beginning
   path check                    Validate all paths exist
   path clean                    Remove duplicates and missing paths

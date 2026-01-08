@@ -115,6 +115,30 @@ The `path` command **MUST** be a shell function that gets sourced into your shel
 
 MIT License - see [LICENSE](LICENSE.txt) for details.
 
+## Development
+
+### Making a Release
+
+Use the Makefile to manage releases:
+
+```bash
+# Full release workflow (bump version, tag, push, update Homebrew formula)
+make release VERSION=x.y.z
+
+# Or run individual steps:
+make bump-version VERSION=x.y.z  # Commit version changes
+make tag VERSION=x.y.z            # Create signed git tag
+make push                         # Push commits and tags
+make update-formula VERSION=x.y.z # Update Homebrew formula with SHA
+```
+
+The `release` target automates:
+1. Bumping version in relevant files and committing
+2. Creating a signed git tag
+3. Pushing commits and tags to GitHub
+4. Downloading the release tarball and computing SHA256
+5. Updating the Homebrew formula with new version and SHA
+
 ## Contributing
 
 Issues and pull requests welcome at [github.com/boochtek/path-manager](https://github.com/boochtek/path-manager).
